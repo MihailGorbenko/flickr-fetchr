@@ -3,9 +3,13 @@ package com.gomihagle.photogallery.controller;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.widget.SearchView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -49,6 +53,7 @@ public class PhotoGalleryFragment extends Fragment implements PhotoListViewModel
        mViewModel.subscribeForUpdates(this);
        mPhotoAdapter = new PhotoAdapter();
        mViewModel.registerForInitLoadCallback(this);
+       setHasOptionsMenu(true);
     }
 
     @Nullable
@@ -62,6 +67,28 @@ public class PhotoGalleryFragment extends Fragment implements PhotoListViewModel
         return mBinding.getRoot();
     }
 
+    @Override
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.fragment_photo_gallery,menu);
+
+        MenuItem menuItem  = menu.findItem(R.id.menu_item_search);
+        final SearchView searchView = (SearchView) menuItem.getActionView();
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                //TODO save to prefs
+                mViewModel.searchByPrefs();
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                return false;
+            }
+        });
+    }
 
     @Override
     public void dataSetChanged() {

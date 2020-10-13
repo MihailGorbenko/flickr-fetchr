@@ -27,6 +27,10 @@ public class PhotoListViewModel extends AndroidViewModel{
     private Drawable mTempDrawable;
     private InitLoadCallback mLoadCallback;
 
+    public void searchByPrefs() {
+        mRepository.searchByPrefs();
+    }
+
     public interface InitLoadCallback{
         void onInitLoad();
     }

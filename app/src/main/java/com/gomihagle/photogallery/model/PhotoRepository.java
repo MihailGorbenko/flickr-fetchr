@@ -55,6 +55,9 @@ public class PhotoRepository {
             .appendQueryParameter("extras","url_s")
             .build();
     private static final int CACHE_SIZE = 1024*1024*2000;
+    private boolean searched_set;
+    private static final int QUERY_SEARCH = 850;
+    private static final int QUERY_RECENT = 620;
 
     private static PhotoRepository instance;
     private MutableLiveData<List<GalleryItem>> mMutableLiveData;
@@ -72,6 +75,7 @@ public class PhotoRepository {
         mMutableLiveData = new MutableLiveData<>();
         pagesCount = 0;
         lastLoadedPage = 0;
+        searched_set = false;
         Handler responseHandler = new Handler();
         mThumbnailDownloader = new ThumbnailDownloader(responseHandler);
         mThumbnailDownloader.start();
@@ -97,7 +101,7 @@ public class PhotoRepository {
     }
 
     public LiveData<List<GalleryItem>> initLoad() {
-        new LoadRecentTask().execute(pagesCount);
+        new LoadImagesTask().execute(QUERY_RECENT,pagesCount);
         lastLoadedPage++;
 
         return mMutableLiveData;
@@ -106,7 +110,10 @@ public class PhotoRepository {
     public void loadMore() {
         int reqPage = lastLoadedPage + 1;
         if(reqPage > pagesCount) return;
-        new LoadRecentTask().execute(reqPage);
+        if(searched_set)
+            new LoadImagesTask().execute(QUERY_SEARCH,reqPage);
+        else
+            new LoadImagesTask().execute(QUERY_RECENT,reqPage);
         lastLoadedPage++;
     }
 
@@ -214,37 +221,38 @@ public class PhotoRepository {
 
     }
 
-    private class  LoadQuerySearchTask extends AsyncTask<String,Void,Void>
-    {
-
-        @Override
-        protected Void doInBackground(String...query) {
-            int page;
-            try
-            {
-                page = Integer.parseInt(query[1]);
-            }catch (NumberFormatException parseException)
-            {
-                page = 0;
-            }
-
-                String url = buildUrl(SEARCH_METHOD,query[0],page);
-
-               List<GalleryItem> itemList =  downloadGalleryItems(url);
-               mMutableLiveData.postValue(itemList);
-               return null;
-        }
-
-
+    public void searchByPrefs() {
+        searched_set = true;
+        new LoadImagesTask().execute(QUERY_SEARCH,0);
     }
 
 
-    private class LoadRecentTask extends AsyncTask<Integer,Void,Void>{
+
+
+
+    @SuppressLint("StaticFieldLeak")
+    private class LoadImagesTask extends AsyncTask<Integer,Void,Void>{
 
         @Override
-        protected Void doInBackground(Integer... page) {
+        protected Void doInBackground(Integer... args) {
 
-           String url = buildUrl(FETCH_RECENT_METHOD,null,page[0]);
+            if(args.length!=2) return null;
+            String url = "";
+            switch (args[0])
+            {
+                case QUERY_RECENT:
+                {
+                    url = buildUrl(FETCH_RECENT_METHOD,null,args[1]);
+                    break;
+                }
+                case QUERY_SEARCH:
+                {
+                    String query = "";//TODO  get query from prefs
+                    url = buildUrl(SEARCH_METHOD,query,args[1]);
+                    break;
+                }
+            }
+
 
            List<GalleryItem> itemList = downloadGalleryItems(url);
            mMutableLiveData.postValue(itemList);
@@ -291,10 +299,9 @@ public class PhotoRepository {
 
                 byte[] byteImage = getUrlBytes(url);
                 final  Bitmap bitmap = BitmapFactory.decodeByteArray(byteImage,0,byteImage.length);
-                mResponseHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if(mRequestMap.get(binding)!=url) return;
+                mResponseHandler.post(() -> {
+                    if(mRequestMap.get(binding).equals(url))
+                    {
                         mRequestMap.remove(binding);
                         Drawable drawable = new BitmapDrawable(mContext.getResources(),bitmap);
                         mLruCache.put(url,drawable);
