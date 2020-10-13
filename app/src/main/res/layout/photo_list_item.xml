@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+    <data>
+        <variable
+            name="photoViewModel"
+            type="com.gomihagle.photogallery.model.ui.PhotoListViewModel" />
+        <variable
+            name="listPosition"
+            type="Integer" />
+    </data>
+
+    <ImageView
+        android:layout_margin="1dp"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:id="@+id/image_placeholder"
+        android:scaleType="centerCrop"
+        android:src="@drawable/temp_image"/>
+</layout>
+
