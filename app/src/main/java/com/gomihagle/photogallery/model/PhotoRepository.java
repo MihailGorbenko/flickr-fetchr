@@ -76,7 +76,7 @@ public class PhotoRepository {
         mThumbnailDownloader = new ThumbnailDownloader(responseHandler);
         mThumbnailDownloader.start();
         mThumbnailDownloader.getLooper();
-        Log.i("REPO","Background Thread Started");
+
         mLruCache = new LruCache<>(CACHE_SIZE);
         mTempDrawable = ResourcesCompat.getDrawable(mContext.getResources(), R.drawable.temp_image,null);
 
