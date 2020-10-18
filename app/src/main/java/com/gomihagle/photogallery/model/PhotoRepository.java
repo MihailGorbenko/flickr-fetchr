@@ -64,7 +64,6 @@ public class PhotoRepository {
     private MutableLiveData<List<GalleryItem>> mMutableLiveData;
     private Integer pagesCount;
     private static int lastLoadedPage;
-    private ThumbnailDownloader mThumbnailDownloader;
     private Context mContext;
     private Drawable mTempDrawable;
 
@@ -74,9 +73,6 @@ public class PhotoRepository {
         mContext = application.getApplicationContext();
         mMutableLiveData = new MutableLiveData<>();
         Handler responseHandler = new Handler();
-        mThumbnailDownloader = new ThumbnailDownloader(responseHandler);
-        mThumbnailDownloader.start();
-        mThumbnailDownloader.getLooper();
 
         mTempDrawable = ResourcesCompat.getDrawable(mContext.getResources(), R.drawable.temp_image,null);
 
@@ -90,11 +86,6 @@ public class PhotoRepository {
         return instance;
     }
 
-
-    public void finalize ()
-    {
-        mThumbnailDownloader.quit();
-    }
 
     public LiveData<List<GalleryItem>> recentLoad() {
         pagesCount = 0;
@@ -207,8 +198,6 @@ public class PhotoRepository {
     public void loadImage(PhotoListItemBinding binding,String url) {
         if(url!=null)
         {
-            //binding.imagePlaceholder.setImageDrawable(mTempDrawable);
-               // mThumbnailDownloader.queueThumbnail(binding, url);
             Picasso.with(mContext.getApplicationContext())
                     .load(url)
                     .placeholder(mTempDrawable)
@@ -223,9 +212,6 @@ public class PhotoRepository {
         new LoadImagesTask().execute(QUERY_SEARCH,lastLoadedPage);
 
     }
-
-
-
 
 
     @SuppressLint("StaticFieldLeak")
@@ -258,73 +244,5 @@ public class PhotoRepository {
         }
 
     }
-
-
-
-    public class ThumbnailDownloader extends HandlerThread{
-
-        private static final String TAG = "ThumbnailDownloader";
-        public static final  int MESSAGE_DOWNLOAD = 0;
-        private Handler mRequestHandler,mResponseHandler;
-        private ConcurrentHashMap<PhotoListItemBinding,String> mRequestMap = new ConcurrentHashMap<>();
-
-        public ThumbnailDownloader(Handler responseHandler) {
-            super(TAG);
-            mResponseHandler = responseHandler;
-        }
-
-        @SuppressLint("HandlerLeak")
-        @Override
-        protected void onLooperPrepared() {
-            super.onLooperPrepared();
-            mRequestHandler = new Handler(){
-                @Override
-                public void handleMessage(@NonNull Message msg) {
-                    if (msg.what == MESSAGE_DOWNLOAD)
-                    {
-                       PhotoListItemBinding binding = (PhotoListItemBinding) msg.obj;
-                        handleRequest(binding);
-                    }
-                }
-            };
-
-        }
-
-        private void handleRequest(final PhotoListItemBinding binding) {
-            try{
-                final String url = mRequestMap.get(binding);
-                if(url == null)return;
-
-                byte[] byteImage = getUrlBytes(url);
-                final  Bitmap bitmap = BitmapFactory.decodeByteArray(byteImage,0,byteImage.length);
-                mResponseHandler.post(() -> {
-                    final String mainUrl = mRequestMap.get(binding);
-                    if(mainUrl == null)return;
-                    if(mainUrl.equals(url))
-                    {
-                        mRequestMap.remove(binding);
-                        Drawable drawable = new BitmapDrawable(mContext.getResources(),bitmap);
-                        binding.imagePlaceholder.setImageDrawable(drawable);
-                    }
-                });
-            }catch (IOException e)
-            {
-                Log.e(TAG,"Error downloading image!",e);
-            }
-
-        }
-
-        public void queueThumbnail(PhotoListItemBinding binding,String url)
-        {
-            if(url==null)
-                mRequestMap.remove(binding);
-            else {
-                mRequestMap.put(binding,url);
-                mRequestHandler.obtainMessage(MESSAGE_DOWNLOAD,binding).sendToTarget();
-            }
-
-        }
-    }
-
 
 }
