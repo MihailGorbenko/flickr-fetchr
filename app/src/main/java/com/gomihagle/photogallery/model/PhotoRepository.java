@@ -26,6 +26,7 @@ import com.gomihagle.photogallery.R;
 import com.gomihagle.photogallery.databinding.PhotoListItemBinding;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.squareup.picasso.Picasso;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -54,7 +55,7 @@ public class PhotoRepository {
             .appendQueryParameter("nojsoncallback","1")
             .appendQueryParameter("extras","url_s")
             .build();
-    private static final int CACHE_SIZE = 1024*1024*2000;
+
     private boolean searched_set;
     private static final int QUERY_SEARCH = 850;
     private static final int QUERY_RECENT = 620;
@@ -65,7 +66,6 @@ public class PhotoRepository {
     private static int lastLoadedPage;
     private ThumbnailDownloader mThumbnailDownloader;
     private Context mContext;
-    private LruCache<String,Drawable> mLruCache;
     private Drawable mTempDrawable;
 
 
@@ -73,15 +73,11 @@ public class PhotoRepository {
     private PhotoRepository(@NonNull Application application) {
         mContext = application.getApplicationContext();
         mMutableLiveData = new MutableLiveData<>();
-        pagesCount = 0;
-        lastLoadedPage = 0;
-        searched_set = false;
         Handler responseHandler = new Handler();
         mThumbnailDownloader = new ThumbnailDownloader(responseHandler);
         mThumbnailDownloader.start();
         mThumbnailDownloader.getLooper();
 
-        mLruCache = new LruCache<>(CACHE_SIZE);
         mTempDrawable = ResourcesCompat.getDrawable(mContext.getResources(), R.drawable.temp_image,null);
 
     }
@@ -100,7 +96,10 @@ public class PhotoRepository {
         mThumbnailDownloader.quit();
     }
 
-    public LiveData<List<GalleryItem>> initLoad() {
+    public LiveData<List<GalleryItem>> recentLoad() {
+        pagesCount = 0;
+        lastLoadedPage = 0;
+        searched_set = false;
         new LoadImagesTask().execute(QUERY_RECENT,pagesCount);
         lastLoadedPage++;
 
@@ -208,22 +207,21 @@ public class PhotoRepository {
     public void loadImage(PhotoListItemBinding binding,String url) {
         if(url!=null)
         {
-            Drawable drawable = mLruCache.get(url);
-            if(drawable !=null)
-                binding.imagePlaceholder.setImageDrawable(drawable);
-            else
-            {
-                binding.imagePlaceholder.setImageDrawable(mTempDrawable);
-                mThumbnailDownloader.queueThumbnail(binding, url);
-            }
-
+            //binding.imagePlaceholder.setImageDrawable(mTempDrawable);
+               // mThumbnailDownloader.queueThumbnail(binding, url);
+            Picasso.with(mContext.getApplicationContext())
+                    .load(url)
+                    .placeholder(mTempDrawable)
+                    .into(binding.imagePlaceholder);
         }
 
     }
 
     public void searchByPrefs() {
         searched_set = true;
-        new LoadImagesTask().execute(QUERY_SEARCH,0);
+        lastLoadedPage = 0;
+        new LoadImagesTask().execute(QUERY_SEARCH,lastLoadedPage);
+
     }
 
 
@@ -247,7 +245,7 @@ public class PhotoRepository {
                 }
                 case QUERY_SEARCH:
                 {
-                    String query = "";//TODO  get query from prefs
+                    String query = QueryPreferences.getStoredQuery(mContext);
                     url = buildUrl(SEARCH_METHOD,query,args[1]);
                     break;
                 }
@@ -300,11 +298,12 @@ public class PhotoRepository {
                 byte[] byteImage = getUrlBytes(url);
                 final  Bitmap bitmap = BitmapFactory.decodeByteArray(byteImage,0,byteImage.length);
                 mResponseHandler.post(() -> {
-                    if(mRequestMap.get(binding).equals(url))
+                    final String mainUrl = mRequestMap.get(binding);
+                    if(mainUrl == null)return;
+                    if(mainUrl.equals(url))
                     {
                         mRequestMap.remove(binding);
                         Drawable drawable = new BitmapDrawable(mContext.getResources(),bitmap);
-                        mLruCache.put(url,drawable);
                         binding.imagePlaceholder.setImageDrawable(drawable);
                     }
                 });
